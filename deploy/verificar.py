@@ -110,11 +110,11 @@ def main():
             hosts = [h for h, ok in zip(hosts, results) if not ok]
         if not hosts:
             if single:
-                print(f"Login HTTPS verificado na VPS. Portal: https://{ip}/")
+                print(f"Login HTTPS verificado. Portal: https://{ip}/")
                 if private:
                     print("Instale a CA pública em cada dispositivo autorizado e confira o SHA-256 por um canal de confiança.")
             else:
-                print("Login HTTPS verificado na VPS para a Central e os cinco portais.")
+                print("Login HTTPS verificado para a Central e os cinco portais.")
             return 0
         if time.monotonic() >= deadline:
             print("Certificado ou login HTTPS ainda pendente em", ", ".join(hosts), file=sys.stderr)

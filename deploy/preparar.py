@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import secrets
 import shutil
+import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,6 +44,88 @@ def ipv4(value):
     if addr.is_loopback or addr.is_unspecified or addr.is_multicast or addr.is_link_local or addr.is_reserved:
         raise ValueError("O endereço IPv4 deve ser alcançável pelos espectadores.")
     return str(addr)
+
+
+PRIVATE_LANS = tuple(map(ipaddress.IPv4Network, ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")))
+# Special-purpose blocks classified differently across Python versions.
+SPECIAL_IPV4 = tuple(map(ipaddress.IPv4Network, ("192.0.0.0/24", "192.88.99.0/24")))
+MANUAL_IPV4 = "Repita o comando com o IPv4 de acesso como argumento."
+
+
+def interface_addresses(link):
+    public, local = set(), set()
+    for entry in link.get("addr_info", []):
+        if entry.get("family") != "inet" or entry.get("scope") != "global":
+            continue
+        if any(entry.get(flag) for flag in ("tentative", "dadfailed", "deprecated")):
+            continue
+        addr = ipaddress.IPv4Address(entry["local"])
+        if any(addr in net for net in PRIVATE_LANS):
+            local.add(str(addr))
+        elif addr.is_global and not addr.is_multicast and not addr.is_reserved and not any(addr in net for net in SPECIAL_IPV4):
+            public.add(str(addr))
+    return public or local
+
+
+def lan_link(link):
+    # With no default route, ignore host-only container and tunnel interfaces.
+    # Ordinary Ethernet, Wi-Fi, VLANs, bonds and administrator-named LAN bridges qualify.
+    name = link.get("ifname", "")
+    if not name or name.startswith(("docker", "veth", "virbr", "podman", "cni", "flannel", "kube")):
+        return False
+    if re.fullmatch(r"br-[0-9a-f]{12,64}", name) or link.get("operstate") in ("DOWN", "LOWERLAYERDOWN", "DORMANT", "NOTPRESENT"):
+        return False
+    kind = link.get("linkinfo", {}).get("info_kind")
+    return (link.get("link_type") == "ether" and "LOOPBACK" not in link.get("flags", [])
+            and kind in (None, "bridge", "bond", "team", "vlan", "macvlan", "ipvlan"))
+
+
+def detect_ipv4():
+    """Use the outgoing interface or the sole eligible interface on an isolated LAN."""
+    def ip_info(*args):
+        try:
+            raw = subprocess.check_output(
+                ["ip", "-j", "-4", *args], stderr=subprocess.DEVNULL, text=True, timeout=5)
+            return json.loads(raw)
+        except (OSError, subprocess.SubprocessError, ValueError) as error:
+            raise ValueError("Não foi possível consultar a rede local. " + MANUAL_IPV4) from error
+
+    routes = ip_info("route", "show", "default")
+    if routes:
+        interfaces = {route.get("dev") for route in routes}
+        if len(interfaces) != 1 or None in interfaces or any(route.get("nexthops") for route in routes):
+            raise ValueError("Não foi possível identificar uma única interface de saída. " + MANUAL_IPV4)
+        links = ip_info("address", "show", "dev", interfaces.pop(), "up", "scope", "global")
+    else:
+        links = [link for link in ip_info("-details", "address", "show", "up", "scope", "global") if lan_link(link)]
+
+    candidates = [addresses for link in links if (addresses := interface_addresses(link))]
+    if not candidates:
+        raise ValueError("Nenhum IPv4 público ou de rede local disponível para a Central. " + MANUAL_IPV4)
+    if len(candidates) != 1 or len(candidates[0]) != 1:
+        raise ValueError("Há mais de um IPv4 ou interface de rede possível para a Central. " + MANUAL_IPV4)
+    return candidates[0].pop()
+
+
+def automatic_address():
+    metadata = ROOT / "runtime" / "instancia.json"
+    if metadata.parent.exists():
+        try:
+            saved = json.loads(metadata.read_text())
+            address = ipv4(saved["ipv4_webrtc"])
+            base = None if saved.get("modo") == "ip" else domain(saved["dominio"])
+        except (OSError, ValueError, TypeError, KeyError, AttributeError) as error:
+            raise ValueError("Recupere runtime/instancia.json para reutilizar o endereço desta instalação.") from error
+        print(f"Usando o IPv4 já configurado: {address}.")
+        return base, address
+    address = detect_ipv4()
+    if ipaddress.IPv4Address(address).is_global:
+        print(f"IPv4 público detectado na máquina: {address}.")
+    else:
+        print(f"IPv4 da rede local detectado: {address}. Endereço da Central na LAN: https://{address}/")
+        print("Após a instalação, confira a impressão SHA-256 e confie na CA pública SMA_CA_Local.crt "
+              "nos dispositivos da rede que acessarão a Central.")
+    return None, address
 
 
 def json_text(value):
@@ -284,17 +367,20 @@ def domain_feature():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--adicionar-ip", action="store_true", help="acrescenta acesso por IP à instalação por domínio existente")
-    parser.add_argument("endereco", help="IPv4, ou domínio do modo legado")
+    parser.add_argument("endereco", nargs="?", help="IPv4 opcional, ou domínio do modo legado")
     parser.add_argument("ipv4_webrtc", nargs="?", help="IPv4 no modo legado por domínio")
     args = parser.parse_args()
-    if args.adicionar_ip and args.ipv4_webrtc:
+    if args.adicionar_ip and (not args.endereco or args.ipv4_webrtc):
         parser.error("--adicionar-ip aceita um único IPv4.")
     try:
-        base = domain(args.endereco) if args.ipv4_webrtc else None
-        address = ipv4(args.ipv4_webrtc or args.endereco)
         fd = os.open(ROOT, os.O_RDONLY | os.O_DIRECTORY)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
+            if args.endereco is not None:
+                base = domain(args.endereco) if args.ipv4_webrtc is not None else None
+                address = ipv4(args.ipv4_webrtc if args.ipv4_webrtc is not None else args.endereco)
+            else:
+                base, address = automatic_address()
             result = configure(base, address, args.adicionar_ip)
             domain_feature()
             print(result)

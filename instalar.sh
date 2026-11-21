@@ -2,11 +2,13 @@
 set -eu
 cd "$(dirname "$0")"
 help() {
-    echo "Uso: sudo ./instalar.sh IPV4" >&2
+    echo "Uso: sudo ./instalar.sh [IPV4]" >&2
+    echo "Sem argumento, detecta o IPv4 da VPS ou da rede local. Para acesso externo por NAT, informe o IPv4 público." >&2
     echo "Instalação por domínio: sudo ./instalar.sh DOMINIO IPV4" >&2
     echo "Adicionar IP à instalação por domínio: sudo ./instalar.sh --adicionar-ip IPV4" >&2
 }
 case "$#" in
+    0) ;;
     1) case "$1" in -*) help; exit 2;; esac ;;
     2) case "$1" in --adicionar-ip) ;; -*) help; exit 2;; esac ;;
     *) help; exit 2;;
@@ -14,16 +16,26 @@ esac
 [ "$(id -u)" = 0 ] || { echo "Execute com sudo na nova VPS." >&2; exit 1; }
 [ "$(uname -m)" = x86_64 ] || { echo "Esta distribuição requer Linux x86-64." >&2; exit 1; }
 
-if ! command -v python3 >/dev/null || ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1 || ! docker buildx version >/dev/null 2>&1; then
+need_iproute=false
+if [ "$#" -eq 0 ] && [ ! -e runtime ] && ! command -v ip >/dev/null; then
+    need_iproute=true
+fi
+if [ "$need_iproute" = true ] || ! command -v python3 >/dev/null || ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1 || ! docker buildx version >/dev/null 2>&1; then
     # Ubuntu provides the engine and the v2 plugin in its signed archive.
     # On other distributions, respect the administrator's selected package source.
     . /etc/os-release
     case "${ID:-}:${VERSION_ID:-}" in
         ubuntu:24.04|ubuntu:26.04) ;;
-        *) echo "Instale Python 3.9+, Docker Engine, Buildx e Docker Compose v2 e repita o comando." >&2; exit 1;;
+        *)
+            if [ "$need_iproute" = true ]; then
+                echo "Para detectar o endereço, instale iproute2 ou informe o IPv4 como argumento." >&2
+            fi
+            echo "Confira também as dependências: Python 3.9+, Docker Engine, Buildx e Docker Compose v2." >&2
+            exit 1;;
     esac
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
+    if [ "$need_iproute" = true ]; then apt-get install -y --no-install-recommends iproute2; fi
     if ! command -v python3 >/dev/null; then apt-get install -y --no-install-recommends python3; fi
     if ! command -v docker >/dev/null; then apt-get install -y --no-install-recommends docker.io; fi
     if dpkg-query -W -f='${db:Status-Abbrev}' docker-ce-cli 2>/dev/null | grep -q '^ii'; then
