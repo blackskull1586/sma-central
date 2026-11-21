@@ -68,8 +68,8 @@ class CustomDomainTests(TestCase):
     def test_owner_link_source_and_admin_visibility(self):
         page=self.central.get('/ambientes/',secure=True)
         self.assertContains(page,'href="/dominios/"')
-        self.assertContains(page,'<!-- feito sgt chagas e por sgt braga -->')
-        self.assertContains(Client(HTTP_HOST=IP).get('/login/',secure=True),'feito sgt chagas e por sgt braga')
+        self.assertContains(page,'<!-- desenvolvido por sgt Chagas e sgt Braga -->')
+        self.assertContains(Client(HTTP_HOST=IP).get('/login/',secure=True),'desenvolvido por sgt Chagas e sgt Braga')
         self.assertEqual(Client(HTTP_HOST=IP).get('/dominios/',secure=True).status_code,302)
         for role in (self.admin,User.objects.create_user(username='leitor',environment=self.sma,
                                                         role=User.Role.VIEWER,must_change_password=False)):
