@@ -2,8 +2,8 @@
 # SMA Central. Baixa o código do commit indicado e confere cada arquivo antes da instalação.
 set -euo pipefail
 umask 077
-commit='c4f57cca703d040d215c493ec709bfbeeb2da3de'
-manifest_sha256='acb478f82ea97b5ec0de7c9c1c3730f9ec937b5fbb53aa1a06dcad0c5c20967f'
+commit='dac436bb8e145a892b4de8cf363927a2290741ae'
+manifest_sha256='b328e581e59d84ab8964cb9fe79d14bbe856f1444ada89d530e2168d62b25737'
 repo='blackskull1586/sma-central'
 dest=/opt/SMA_Central
 case "${1:-}" in
