@@ -2,15 +2,15 @@
 # SMA Central. Baixa o código do commit indicado e confere cada arquivo antes da instalação.
 set -euo pipefail
 umask 077
-commit='dac436bb8e145a892b4de8cf363927a2290741ae'
-manifest_sha256='b328e581e59d84ab8964cb9fe79d14bbe856f1444ada89d530e2168d62b25737'
+commit='20a753e54bb3e1f40414327b8959a8424fafe178'
+manifest_sha256='140bbcb18f72b34245f4d2d9480bd2b5a57aa8916a22540c68819bbc7456d813'
 repo='blackskull1586/sma-central'
 dest=/opt/SMA_Central
 case "${1:-}" in
-    -h|--help) echo "Uso: sudo bash setup.sh IPV4"; exit 0 ;;
+    -h|--help) echo "Uso: sudo bash setup.sh [IPV4]"; exit 0 ;;
 esac
-if (( $# != 1 )); then echo "Uso: sudo bash setup.sh IPV4" >&2; exit 2; fi
-if (( EUID != 0 )); then echo "Execute com sudo bash setup.sh IPV4." >&2; exit 1; fi
+if (( $# > 1 )); then echo "Uso: sudo bash setup.sh [IPV4]" >&2; exit 2; fi
+if (( EUID != 0 )); then echo "Execute com sudo bash setup.sh." >&2; exit 1; fi
 if ! command -v python3 >/dev/null; then
     if command -v apt-get >/dev/null; then
         (umask 022; apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python3)
@@ -18,7 +18,8 @@ if ! command -v python3 >/dev/null; then
         echo "Instale Python 3.9 ou superior e execute novamente." >&2; exit 1
     fi
 fi
-python3 - "$1" <<'PY'
+if (( $# == 1 )); then
+    python3 - "$1" <<'PY'
 import ipaddress,sys
 try:
     addr=ipaddress.IPv4Address(sys.argv[1])
@@ -27,6 +28,7 @@ try:
 except ValueError:
     sys.exit('Informe o IPv4 alcançável pelos dispositivos que acessarão a Central.')
 PY
+fi
 command -v flock >/dev/null || { echo "Instale util-linux e repita o comando." >&2; exit 1; }
 mkdir -p -m 0755 /opt
 mkdir -p -m 0700 /run/sma-central
@@ -118,4 +120,4 @@ PY
     trap - EXIT
 fi
 umask 022
-exec bash ./instalar.sh "$1"
+exec bash ./instalar.sh "$@"
