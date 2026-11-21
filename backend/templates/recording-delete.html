@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Excluir vídeo{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% url 'recordings_css' %}">{% endblock %}
+{% block content %}
+<section class="panel form-panel">
+  <p class="eyebrow">Gravações</p>
+  <h1>Excluir vídeo</h1>
+  <p>Deseja excluir a gravação de <strong>{{ recording.channel_name }}</strong>?</p>
+  <dl class="recording-meta">
+    <div><dt>Servidor</dt><dd>{{ recording.environment_name }}</dd></div>
+    <div><dt>Ambiente</dt><dd>{{ recording.unit_name|default:'Sem ambiente' }}</dd></div>
+    <div><dt>Início · UTC−04</dt><dd>{{ recording.gdh }}</dd></div>
+    <div><dt>Fonte</dt><dd>{{ recording.slot }}</dd></div>
+    <div><dt>Duração</dt><dd>{{ recording.duration }}</dd></div>
+  </dl>
+  <p class="recording-note">A exclusão é definitiva. O vídeo e os arquivos originais desta gravação serão removidos do acervo. Baixe uma cópia antes, se precisar guardá-la.</p>
+  {% if error %}<p class="notice" role="alert">{{ error }}</p>{% endif %}
+  {% if recording.deletable %}
+  <form method="post" action="{% url 'recording_delete' recording.url_id %}">
+    {% csrf_token %}
+    <input type="hidden" name="confirmation" value="{{ recording.url_id }}">
+    <input type="hidden" name="retorno" value="{{ return_query }}">
+    <div class="actions"><button class="danger" type="submit">Excluir definitivamente</button><a class="button secondary" href="{{ back_url }}">Cancelar</a>{% if recording.playable %}<a href="{% url 'recording_download' recording.url_id %}">Baixar MP4</a>{% endif %}</div>
+  </form>
+  {% else %}<a class="button secondary" href="{{ back_url }}">Voltar às gravações</a>{% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Gravações{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% url 'recordings_css' %}">{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">Administração central</p><h1>Gravações</h1></div><a class="button secondary" href="{% url 'recordings' %}">Atualizar lista</a></div>
+<p class="page-lead">Assista, baixe ou exclua os vídeos das transmissões. Datas e horários em UTC−04.</p>
+<section class="panel">
+<form method="get" class="recording-filters">
+<label>Servidor<select name="servidor"><option value="">Todos os SMA</option>{% for id, name in servers %}<option value="{{ id }}"{% if server == id %} selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
+<label>Canal ou ambiente<input name="busca" value="{{ query }}" maxlength="100" placeholder="Buscar por nome"></label>
+<label>De<input type="date" name="inicio" value="{{ start }}"></label>
+<label>Até<input type="date" name="fim" value="{{ end }}"></label>
+<button type="submit" class="primary">Filtrar</button><a href="{% url 'recordings' %}">Limpar</a>
+</form>
+<p class="muted">{{ total }} {% if total == 1 %}gravação encontrada{% else %}gravações encontradas{% endif %}</p>
+<div class="table-wrap"><table><thead><tr><th>Canal / servidor</th><th>Início · UTC−04</th><th>Duração</th><th>Situação</th><th>Ações</th></tr></thead><tbody>
+{% for item in recordings %}<tr>
+<td><strong>{{ item.channel_name }}</strong><span class="recording-sub">{{ item.environment_name }}{% if item.unit_name %} · {{ item.unit_name }}{% endif %} · Fonte {{ item.slot }}</span></td>
+<td>{{ item.gdh }}</td><td>{{ item.duration }}</td><td>{{ item.state_label }}{% if item.playable %}<span class="recording-sub">{{ item.size_label }}</span>{% endif %}</td>
+<td><div class="recording-actions">{% if item.playable %}<a href="{% url 'recording_detail' item.url_id %}">Assistir</a><a href="{% url 'recording_download' item.url_id %}">Baixar MP4</a>{% endif %}{% if item.deletable %}<a class="danger" href="{% url 'recording_delete' item.url_id %}{% if return_query %}?retorno={{ return_query|urlencode }}{% endif %}" aria-label="Excluir gravação de {{ item.channel_name }} em {{ item.gdh }}">Excluir</a>{% elif not item.playable %}<span class="muted">Disponível após finalizar</span>{% endif %}</div></td>
+</tr>{% empty %}<tr><td colspan="5"><div class="recording-empty"><strong>Nenhuma gravação encontrada.</strong><p class="muted">As novas transmissões serão listadas aqui. Se você aplicou filtros, tente alterá-los.</p></div></td></tr>{% endfor %}
+</tbody></table></div>
+{% if recordings.has_other_pages %}<nav class="recording-pagination" aria-label="Páginas de gravações">{% if recordings.has_previous %}<a href="?{{ filters }}&amp;pagina={{ recordings.previous_page_number }}">Anterior</a>{% endif %}<span>Página {{ recordings.number }} de {{ recordings.paginator.num_pages }}</span>{% if recordings.has_next %}<a href="?{{ filters }}&amp;pagina={{ recordings.next_page_number }}">Próxima</a>{% endif %}</nav>{% endif %}
+</section>
+<p class="muted recording-note">Transmissões longas podem gerar vários arquivos. Operadores que usam a mesma chave são diferenciados pela fonte; a chave compartilhada não identifica o nome da pessoa.</p>
+{% endblock %}

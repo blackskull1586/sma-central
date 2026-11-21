@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Quem pode assistir{% endblock %}
+{% block content %}
+<section class="panel form-panel" data-channel-id="{{ channel.pk }}">
+  <a class="back" href="{% url 'dashboard' %}#canais"><span aria-hidden="true">←</span> Voltar aos canais</a>
+  <p class="eyebrow">{{ current_environment.name }}</p>
+  <h1>Quem pode assistir</h1>
+  <p>{{ channel.name }}</p>
+  <p class="context-note">{% if channel.audience_restricted %}{% if channel.allowed_viewers.exists %}Acesso atual: somente as contas selecionadas e o Central.{% else %}Acesso atual: somente o Central. Nenhuma conta permanece na seleção.{% endif %}{% else %}Acesso atual: todas as contas deste servidor e o Central.{% endif %}</p>
+  <p class="notice">Ao salvar sem nenhuma conta marcada, todos deste servidor poderão assistir, inclusive de outros ambientes.</p>
+  <form method="post">
+    {% csrf_token %}
+    {% include 'form-fields.html' %}
+    <div class="actions"><button class="primary" type="submit">Salvar permissões</button><a class="button secondary" href="{% url 'dashboard' %}#canais">Cancelar</a></div>
+  </form>
+</section>
+{% endblock %}

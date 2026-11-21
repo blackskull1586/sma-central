@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Excluir canal{% endblock %}
+{% block content %}
+<section class="panel form-panel" data-channel-id="{{ channel.pk }}">
+  <p class="eyebrow">Canais</p>
+  <h1>Excluir canal</h1>
+  <p>Deseja excluir o canal <strong>{{ channel.name }}</strong> {% if user.is_owner %}do servidor{% else %}do ambiente{% endif %} <strong>{{ current_environment.name }}</strong>?</p>
+  {% if user.is_owner %}<p class="hint">Ambiente: {{ channel.unit.name|default:'Área inicial (sem ambiente vinculado)' }}.</p>{% endif %}
+  <p>A exclusão é permanente, invalida a chave e interrompe {% if user.is_owner %}todas as transmissões e a visualização{% else %}a transmissão e a visualização{% endif %} deste canal.</p>
+  {% if error %}<p class="notice" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="{% url 'channel_delete' channel.pk %}">
+    {% csrf_token %}
+    <input type="hidden" name="confirmation" value="{{ channel.pk }}">
+    <div class="actions"><button class="danger" type="submit">Excluir canal</button><a class="button secondary" href="{% url 'dashboard' %}">Cancelar</a></div>
+  </form>
+</section>
+{% endblock %}

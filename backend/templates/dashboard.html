@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}{% if user.is_owner %}Canais e usuários{% else %}Administração{% endif %}{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">{% if user.is_owner %}Canais e usuários{% else %}Administração{% endif %}</p><h1>{{ current_environment.name }}</h1></div></div>
+{% if user.is_owner %}
+<nav class="quick-links" aria-label="Atalhos da administração"><a href="#canais">Canais</a><a href="#usuarios">Usuários</a><a href="{% url 'environments' %}">Trocar servidor</a></nav>
+{% endif %}
+<section class="panel" id="canais">
+  <div class="section-heading"><h2><span class="section-index" aria-hidden="true">01</span>Canais</h2><a class="button primary" href="{% url 'channel_create' %}"><span aria-hidden="true">+</span> Novo canal</a></div>
+  {% if user.is_owner %}<p class="section-help">Cadastre o canal, consulte a chave e escolha quem pode assistir. Uma mesma chave pode receber várias transmissões.</p>{% endif %}
+  <div class="table-wrap"><table class="responsive-table" aria-label="Canais de transmissão">
+    <thead><tr><th>Canal</th><th>Situação</th><th>Ações</th></tr></thead>
+    <tbody>
+    {% for channel in channels %}
+    <tr data-channel-id="{{ channel.pk }}">
+      <td class="cell-name"><strong>{{ channel.name }}</strong>{% if user.is_owner %}<br><span class="muted">Ambiente: {{ channel.unit.name|default:'Área inicial (sem ambiente vinculado)' }}</span>{% endif %}</td>
+      <td data-label="Situação"><span class="status {% if channel.online %}active{% endif %}">{% if not channel.active %}Desativado{% elif channel.online %}Transmitindo{% else %}Sem transmissão{% endif %}</span></td>
+      <td class="cell-actions"><div class="actions compact">
+        <a href="{% url 'channel_edit' channel.pk %}">Editar</a>
+        <a href="{% url 'channel_show_credentials' channel.pk %}">{% if user.is_owner %}Chave de transmissão{% else %}Credenciais{% endif %}</a>
+        {% if user.is_owner %}<a href="{% url 'channel_viewers' channel.pk %}">Quem pode assistir</a>{% endif %}
+        <form method="post" action="{% url 'channel_key' channel.pk %}" data-confirm="{% if user.is_owner %}Gerar uma nova chave invalida a anterior e interrompe todas as transmissões deste canal. Continuar?{% else %}Gerar uma nova chave invalida a anterior e interrompe a transmissão atual. Continuar?{% endif %}">{% csrf_token %}<button class="subtle" type="submit">Nova chave</button></form>
+        <form method="post" action="{% url 'channel_state' channel.pk %}" {% if channel.active %}data-confirm="{% if user.is_owner %}Desativar este canal interromperá todas as suas transmissões e a visualização. Continuar?{% else %}Desativar este canal interromperá sua transmissão e visualização. Continuar?{% endif %}"{% endif %}>{% csrf_token %}<input type="hidden" name="active" value="{% if channel.active %}0{% else %}1{% endif %}"><button class="subtle {% if channel.active %}danger{% endif %}" type="submit">{% if channel.active %}Desativar{% else %}Ativar{% endif %}</button></form>
+        <a class="danger" href="{% url 'channel_delete' channel.pk %}">Excluir</a>
+      </div></td>
+    </tr>
+    {% empty %}<tr><td colspan="3" class="empty">Nenhum canal cadastrado.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+<section class="panel" id="usuarios">
+  <div class="section-heading"><h2><span class="section-index" aria-hidden="true">02</span>{% if user.is_owner %}Usuários{% else %}Acessos{% endif %}</h2><a class="button primary" href="{% url 'account_create' %}"><span aria-hidden="true">+</span> {% if user.is_owner %}Novo usuário{% else %}Novo acesso{% endif %}</a></div>
+  {% if user.is_owner %}<p class="section-help">Crie contas para este servidor e defina o ambiente e o perfil de cada pessoa. Consulte Dados de acesso para entregar o endereço, o usuário e a senha provisória.</p>{% endif %}
+  <div class="table-wrap"><table class="responsive-table" aria-label="{% if user.is_owner %}Usuários do servidor{% else %}Acessos ao ambiente{% endif %}">
+    <thead><tr><th>Usuário</th><th>Perfil</th><th>Situação</th><th>Ações</th></tr></thead>
+    <tbody>
+    {% for account in accounts %}
+    <tr data-user-id="{{ account.pk }}" data-username="{{ account.username }}">
+      <td class="cell-name"><strong>{{ account.username }}</strong>{% if account.first_name %}<br><span class="muted">{{ account.first_name }}</span>{% endif %}{% if user.is_owner %}<br><span class="muted">Ambiente: {{ account.unit.name|default:'Área inicial (sem ambiente vinculado)' }}</span>{% endif %}</td>
+      <td data-label="Perfil">{{ account.get_role_display }}</td>
+      <td data-label="Situação"><div><span class="status {% if account.is_active %}active{% endif %}">{% if account.is_active %}Ativo{% else %}Desativado{% endif %}</span>{% if account.must_change_password %}<span class="hint">Senha provisória</span>{% endif %}</div></td>
+      <td class="cell-actions">
+        {% if account.pk != user.pk %}{% if user.is_owner or account.role == 'viewer' %}
+        <div class="actions compact">{% if user.is_owner %}<a href="{% url 'account_unit' account.pk %}">Alterar ambiente</a>{% endif %}<a href="{% url 'account_credentials' account.pk %}">{% if user.is_owner %}Dados de acesso{% else %}Credenciais{% endif %}</a><a href="{% url 'account_password' account.pk %}">Redefinir senha</a><form method="post" action="{% url 'account_state' account.pk %}">{% csrf_token %}<input type="hidden" name="active" value="{% if account.is_active %}0{% else %}1{% endif %}"><button class="subtle {% if account.is_active %}danger{% endif %}" type="submit">{% if account.is_active %}Desativar{% else %}Ativar{% endif %}</button></form><a class="danger" href="{% url 'account_delete' account.pk %}">Excluir</a></div>
+        {% endif %}{% else %}<span class="muted">Sua conta</span>{% endif %}
+      </td>
+    </tr>
+    {% empty %}<tr><td colspan="4" class="empty">{% if user.is_owner %}Nenhum usuário cadastrado neste servidor.{% else %}Nenhum acesso cadastrado.{% endif %}</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+<details class="panel activity-panel">
+  <summary>Atividades recentes</summary>
+  <ul class="activity-list">{% for event in events %}<li><time>{{ event.created_at|date:'d/m/Y H:i' }}</time><span>{{ event.action }} · {{ event.target }}</span><span class="muted">{{ event.actor.username|default:'Conta removida' }}</span></li>{% empty %}<li class="muted">Nenhuma atividade registrada.</li>{% endfor %}</ul>
+</details>
+{% endblock %}

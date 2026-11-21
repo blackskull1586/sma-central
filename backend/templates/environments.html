@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Servidores{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">Administração central</p><h1>Servidores</h1></div><a class="button primary" href="{% url 'environment_create' %}"><span aria-hidden="true">+</span> Novo servidor</a></div>
+<p class="page-lead">Escolha o servidor SMA para administrar seus ambientes, usuários e canais.</p>
+<details class="setup-guide">
+  <summary>Como configurar o SMA</summary>
+  <ol>
+    <li><strong>Servidor:</strong> abra a administração do SMA desejado.</li>
+    <li><strong>Ambientes:</strong> organize as equipes dentro desse servidor.</li>
+    <li><strong>Usuários:</strong> crie as contas e escolha o ambiente e o perfil de cada pessoa.</li>
+    <li><strong>Canais:</strong> crie o canal, consulte a chave de transmissão e defina quem pode assistir.</li>
+  </ol>
+  <p>O ambiente organiza a administração. A permissão de assistir é definida em cada canal: salvar sem selecionar contas libera a visualização para todos do mesmo servidor, inclusive de outros ambientes.</p>
+</details>
+<div class="environment-grid">
+{% for item in environments %}
+<article class="panel environment-card" data-environment-id="{{ item.pk }}" data-environment-slug="{{ item.slug }}">
+  <p class="eyebrow environment-code">{{ item.slug }}</p>
+  <div class="row"><h2>{{ item.name }}</h2><span class="status {% if item.active %}active{% endif %}">{% if item.active %}Ativo{% else %}Desativado{% endif %}</span></div>
+  <dl class="metrics"><div><dt>Usuário{{ item.user_count|pluralize:'s' }}</dt><dd>{{ item.user_count }}</dd></div><div><dt>{% if item.channel_count == 1 %}Canal{% else %}Canais{% endif %}</dt><dd>{{ item.channel_count }}</dd></div></dl>
+  <div class="actions">
+    {% if item.active %}
+    <form method="post" action="{% url 'environment_select' item.pk %}">{% csrf_token %}<button class="primary" type="submit">Administrar {{ item.name }} <span class="button-arrow" aria-hidden="true">→</span></button></form>
+    <details class="row-options"><summary>Opções</summary><form method="post" action="{% url 'environment_state' item.pk %}" data-confirm="Desativar este servidor bloqueará seus ambientes, usuários e transmissões. Continuar?">{% csrf_token %}<input type="hidden" name="active" value="0"><button class="subtle danger" type="submit">Desativar servidor</button></form></details>
+    {% else %}
+    <form method="post" action="{% url 'environment_state' item.pk %}">{% csrf_token %}<input type="hidden" name="active" value="1"><button class="secondary" type="submit">Ativar servidor</button></form>
+    {% endif %}
+  </div>
+</article>
+{% empty %}<section class="panel"><p class="muted">Nenhum servidor cadastrado.</p></section>{% endfor %}
+</div>
+{% endblock %}

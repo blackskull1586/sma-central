@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Excluir ambiente{% endblock %}
+{% block content %}
+<section class="panel form-panel">
+  <a class="back" href="{% url 'units' %}">← Voltar aos ambientes</a>
+  <p class="form-context">Servidor: <strong>{{ unit.environment.name }}</strong></p>
+  <h1>Excluir ambiente</h1>
+  <p>Ambiente: <strong>{{ unit.name }}</strong></p>
+  {% if error %}<p class="notice" role="alert">{{ error }}</p>{% endif %}
+  {% if user_count or channel_count %}
+    <p class="notice">Este ambiente tem <strong>{{ user_count }} usuário{{ user_count|pluralize }}</strong> e <strong>{{ channel_count }} cana{{ channel_count|pluralize:'l,is' }}</strong> vinculado{{ channel_count|pluralize }}. A exclusão está bloqueada.</p>
+    <p>Antes de excluir, altere o ambiente dos usuários ou exclua as contas que não forem mais necessárias. Os canais vinculados também precisam ser excluídos. Contas e canais desativados continuam vinculados.</p>
+    <form method="post" action="{% url 'unit_accounts' unit.pk %}">
+      {% csrf_token %}
+      <div class="actions"><button class="primary" type="submit" name="action" value="manage">Gerenciar usuários e canais</button><a class="button secondary" href="{% url 'units' %}">Cancelar</a></div>
+    </form>
+  {% else %}
+    <p>Este ambiente não possui usuários nem canais vinculados. A exclusão é permanente e o histórico de administração será preservado.</p>
+    <form method="post" action="{% url 'unit_delete' unit.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="confirmation" value="{{ unit.pk }}">
+      <div class="actions"><button class="danger" type="submit">Excluir ambiente</button><a class="button secondary" href="{% url 'units' %}">Cancelar</a></div>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}

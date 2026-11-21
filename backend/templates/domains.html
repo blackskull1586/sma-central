@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Domínios{% endblock %}
+{% block content %}
+<div class="page-heading"><h1>Domínios</h1></div>
+<section class="panel form-panel">
+  <h2>Cadastrar domínio</h2>
+  <p>No provedor do domínio, crie um registro <strong>A</strong> apontando para <strong>{{ public_ip|default:'o IPv4 público desta VPS' }}</strong>. Use apenas esse IPv4. {% if public_ipv6 %}Se usar o registro <strong>AAAA</strong>, aponte-o para <strong>{{ public_ipv6 }}</strong>.{% else %}Deixe o nome sem registro AAAA enquanto a VPS não tiver IPv6 público configurado.{% endif %} O SMA verificará o DNS e solicitará o certificado HTTPS.</p>
+  <form method="post" action="{% url 'domains' %}">
+    {% csrf_token %}{% include 'form-fields.html' %}
+    <button class="primary" type="submit">Cadastrar domínio</button>
+  </form>
+</section>
+<section class="panel">
+  <div class="section-heading"><h2>Domínios cadastrados</h2><a class="button secondary" href="{% url 'domains' %}">Atualizar situação</a></div>
+  {% if domains %}
+  <div class="table-wrap"><table>
+    <thead><tr><th scope="col">Domínio</th><th scope="col">Situação</th><th scope="col">Última verificação</th><th scope="col">Ações</th></tr></thead>
+    <tbody>{% for domain in domains %}<tr>
+      <td data-label="Domínio">{% if domain.enabled and domain.status == 'active' %}<a href="https://{{ domain.hostname }}/login/">{{ domain.hostname }}</a>{% else %}{{ domain.hostname }}{% endif %}</td>
+      <td data-label="Situação">{% if domain.enabled or domain.status == 'disabled' %}{{ domain.get_status_display }}{% else %}Desativação solicitada{% endif %}
+        {% if domain.detail %}<p class="hint">{{ domain.detail }}</p>{% endif %}</td>
+      <td data-label="Última verificação">{{ domain.checked_at|date:"d/m/Y H:i T"|default:"Aguardando" }}</td>
+      <td data-label="Ações"><form method="post" action="{% url 'domain_state' domain.pk %}">{% csrf_token %}
+        {% if domain.enabled %}{% if domain.status != 'active' %}<button class="secondary" name="action" value="retry">Verificar novamente</button>{% endif %}
+        <button class="subtle danger" name="action" value="disable">Desativar</button>
+        {% else %}<button class="secondary" name="action" value="enable">Reativar</button>{% endif %}
+      </form></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p>Nenhum domínio cadastrado.</p>{% endif %}
+</section>
+{% endblock %}

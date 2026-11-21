@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Monitoramento · {{ monitor_title }}{% endblock %}
+{% block body_class %}monitor-page{% endblock %}
+{% block main_class %}monitor-main{% endblock %}
+{% block head %}<script src="/assets/js/hls.min.js" defer></script><script src="/assets/js/Sortable.min.js" defer></script><script src="/assets/rtc-player.js?v=20260907-1" defer></script><script src="/assets/monitor.js?v=20260907-1" defer></script>{% endblock %}
+{% block content %}
+<h1 class="sr-only">Monitoramento · {{ monitor_title }}</h1>
+{% if user.is_owner %}
+<nav class="sma-filter panel" aria-label="Selecionar SMA">
+  <a href="{% url 'monitor' %}?sma=all" {% if not monitor_environment %}aria-current="page"{% endif %}>Todos os SMA</a>
+  {% for sma in monitor_environments %}<a href="{% url 'monitor' %}?sma={{ sma.pk }}" {% if sma.pk == monitor_environment.pk %}aria-current="page"{% endif %}>{{ sma.name }}</a>{% endfor %}
+</nav>
+{% endif %}
+<div class="controls panel"><div class="layout-controls"><label><input type="checkbox" id="selectAll"> {% if user.is_owner %}Exibir todos os vídeos{% else %}Todos os canais{% endif %}</label><label><input type="checkbox" id="lockLayout"> {% if user.is_owner %}Fixar posição dos vídeos{% else %}Travar layout{% endif %}</label></div><div id="dynamicCheckboxes"></div><span id="connection-status" role="status" class="connection-status">Atualizando…</span></div>
+<p id="empty-streams" class="panel empty">Nenhuma transmissão no momento.</p>
+<div class="stream-grid" id="streams" data-storage-scope="{{ storage_scope }}" data-catalog-url="{{ catalog_url }}" data-show-environment="{{ show_environment|yesno:'true,false' }}" data-default-select-all="{{ default_select_all|yesno:'true,false' }}"></div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<section class="panel form-panel"><a class="back" href="{% if user.is_owner %}{{ back_url }}{% else %}{% url back %}{% endif %}"><span aria-hidden="true">←</span> {% if user.is_owner %}{{ back_label }}{% else %}Voltar{% endif %}</a>
+{% if user.is_owner and form_environment %}<p class="form-context">Servidor: <strong>{{ form_environment.name }}</strong></p>{% endif %}
+<h1>{{ title }}</h1>
+{% if user.is_owner and form_description %}<p class="section-help">{{ form_description }}</p>{% endif %}
+{% if note %}<p class="notice">{{ note }}</p>{% endif %}
+<form method="post">{% csrf_token %}{% include 'form-fields.html' %}<div class="actions"><button class="primary" type="submit">{% if user.is_owner %}{{ submit_label }}{% else %}Salvar{% endif %}</button><a class="button secondary" href="{% if user.is_owner %}{{ back_url }}{% else %}{% url back %}{% endif %}">Cancelar</a></div></form>
+</section>
+{% endblock %}

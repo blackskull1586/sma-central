@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Entrar{% endblock %}
+{% block body_class %}login-page{% endblock %}
+{% block main_class %}login-main{% endblock %}
+{% block content %}
+<div class="login-identity" aria-hidden="true"><span class="identity-line"></span><p>Sistema de<br>Monitoramento<br><span>da Amazônia.</span></p></div>
+<section class="panel form-panel login-panel">
+  <p class="eyebrow">{% if is_owner_portal %}Portal do proprietário{% else %}Portal de acesso{% endif %}</p>
+  <h1>{% if is_shared_portal or is_owner_portal %}SMA Central{% else %}Acesso ao {{ domain_environment.name|default:'SMA' }}{% endif %}</h1>
+  {% if is_owner_portal %}<p class="section-help">Entre com a conta do proprietário para acompanhar os SMA e administrar ambientes, canais e usuários.</p>{% endif %}
+  <form method="post">
+    {% csrf_token %}{% include 'form-fields.html' %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="primary full" type="submit">Entrar <span class="button-arrow" aria-hidden="true">→</span></button>
+  </form>
+  {% if not is_owner_portal %}<p class="hint">Para recuperar seu acesso, contate o administrador.</p>{% endif %}
+</section>
+{% endblock %}

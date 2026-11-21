@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  {% if is_owner_portal or is_shared_portal and not user.is_authenticated %}<!-- feito sgt chagas e por sgt braga -->{% endif %}
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SMA{% endblock %} · Sistema de Monitoramento da Amazônia</title>
+  <link rel="icon" href="/assets/icone.ico">
+  {% if is_owner_portal or is_shared_portal and not user.is_authenticated %}
+  <link rel="manifest" href="/assets/central.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/central-180.png">
+  <meta name="apple-mobile-web-app-title" content="SMA Central">
+  {% endif %}
+  <meta name="theme-color" content="#0b0e12">
+  <link rel="stylesheet" href="/assets/portal.css?v=20260920-central">
+  <script src="/assets/portal.js?v=20260920-central" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="{% if user.is_owner or is_owner_portal %}central-admin {% endif %}{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{% if user.is_owner %}{% url 'environments' %}{% else %}{% url 'monitor' %}{% endif %}">
+        <strong>SMA</strong><span>Sistema de Monitoramento<br>da Amazônia</span>
+      </a>
+      {% if user.is_authenticated %}
+      <nav aria-label="Menu principal">
+        {% if user.is_owner or current_environment.active %}
+        <a href="{% url 'monitor' %}" {% if request.resolver_match.url_name == 'monitor' %}aria-current="page"{% endif %}><svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M7 11h3l2-4 2 7 2-3h2"/></svg>Monitoramento</a>
+        {% endif %}
+        {% if current_environment.active and user.can_manage %}<a href="{% url 'dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' or user.is_owner and central_management_page %}aria-current="page"{% endif %}><svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>{% if user.is_owner %}Canais e usuários{% else %}Administração{% endif %}</a>{% endif %}
+        {% if user.is_owner %}
+        {% if domain_management and is_owner_portal %}<a href="{% url 'domains' %}" {% if request.resolver_match.url_name == 'domains' %}aria-current="page"{% endif %}>Domínios</a>{% endif %}
+        {% if is_owner_portal %}<a href="{% url 'recordings' %}" {% if request.resolver_match.url_name == 'recordings' or request.resolver_match.url_name == 'recording_detail' %}aria-current="page"{% endif %}>Gravações</a>{% endif %}
+        <a href="{% url 'environments' %}" {% if request.resolver_match.url_name == 'environments' or request.resolver_match.url_name == 'environment_create' %}aria-current="page"{% endif %}><svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="18" height="7" rx="1"/><rect x="3" y="14" width="18" height="7" rx="1"/><path d="M7 6.5h1M7 17.5h1"/></svg>Servidores</a>
+        <a href="{% url 'units' %}" {% if request.resolver_match.url_name == 'units' or request.resolver_match.url_name == 'unit_create' or request.resolver_match.url_name == 'unit_edit' %}aria-current="page"{% endif %}><svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Ambientes</a>
+        {% endif %}
+      </nav>
+      <details class="account-menu">
+        <summary><span class="account-avatar" aria-hidden="true">{{ user.first_name|default:user.username|slice:':1'|upper }}</span><span class="account-name">{{ user.first_name|default:user.username }}</span><span class="chevron" aria-hidden="true"></span></summary>
+        <div class="account-options">
+          <span class="muted">{{ user.get_role_display }}{% if current_environment and not user.is_owner %} · {{ current_environment.name }}{% endif %}</span>
+          <a href="{% url 'password_change' %}">Alterar senha</a>
+          <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="subtle" type="submit">Sair</button></form>
+        </div>
+      </details>
+      {% endif %}
+    </div>
+  </header>
+  <main id="conteudo" class="page {% block main_class %}{% endblock %}">
+    {% if messages %}<div class="messages" role="status">{% for message in messages %}<p class="notice">{{ message }}</p>{% endfor %}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer><span class="footer-brand">SMA <span class="footer-divider" aria-hidden="true">/</span> Sistema de Monitoramento da Amazônia</span><span class="footer-meta">{% if environment_label %}{{ environment_label }} · {% endif %}© {% now 'Y' %}</span></footer>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Ambientes{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">Administração central</p><h1>Ambientes</h1></div><a class="button primary" href="{% url 'unit_create' %}"><span aria-hidden="true">+</span> Novo ambiente</a></div>
+<p class="page-lead">Cada ambiente reúne usuários e canais de uma equipe dentro de um servidor SMA.</p>
+<section class="panel">
+  <div class="table-wrap"><table class="responsive-table" aria-label="Ambientes dos servidores SMA">
+    <thead><tr><th>Ambiente</th><th>Servidor</th><th>Usuários</th><th>Canais</th><th>Ações</th></tr></thead>
+    <tbody>
+    {% for item in units %}
+    <tr data-unit-id="{{ item.pk }}" data-environment-id="{{ item.environment_id }}">
+      <td class="cell-name"><strong>{{ item.name }}</strong></td>
+      <td data-label="Servidor">{{ item.environment.name }}{% if not item.environment.active %}<br><span class="muted">Desativado</span>{% endif %}</td>
+      <td data-label="Usuários">{{ item.user_count }}</td><td data-label="Canais">{{ item.channel_count }}</td>
+      <td class="cell-actions">{% if item.environment.active %}<div class="actions compact">
+        <a href="{% url 'unit_edit' item.pk %}">Renomear</a>
+        <form method="post" action="{% url 'unit_accounts' item.pk %}">{% csrf_token %}
+          <button class="subtle" name="action" value="create" type="submit">Criar usuário</button>
+          <button class="subtle" name="action" value="manage" type="submit">Ver usuários do servidor</button>
+        </form>
+        <a class="danger" href="{% url 'unit_delete' item.pk %}">Excluir</a>
+      </div>{% else %}<span class="muted">Ative o servidor para administrar.</span>{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="5" class="empty">Nenhum ambiente cadastrado.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <p class="hint">Ver usuários do servidor mostra todas as contas daquele SMA. Para vincular uma conta existente, use Alterar ambiente.</p>
+</section>
+{% endblock %}

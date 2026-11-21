@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}{{ recording.channel_name }} · Gravação{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% url 'recordings_css' %}">{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">Gravações · {{ recording.environment_name }}</p><h1>{{ recording.channel_name }}</h1></div><a class="button secondary" href="{% url 'recordings' %}">Voltar às gravações</a></div>
+<section class="panel">
+{% if recording.playable %}<video class="recording-player" controls playsinline preload="metadata" aria-label="Gravação de {{ recording.channel_name }}"><source src="{% url 'recording_media' recording.url_id %}" type="video/mp4">Seu navegador não conseguiu reproduzir o vídeo. Use a opção Baixar MP4.</video>{% else %}<p>{{ recording.state_label }}. O vídeo ficará disponível após a finalização.</p>{% endif %}
+<dl class="recording-meta"><div><dt>Início · UTC−04</dt><dd>{{ recording.gdh }}</dd></div><div><dt>Ambiente</dt><dd>{{ recording.unit_name|default:'Sem ambiente' }}</dd></div><div><dt>Fonte</dt><dd>{{ recording.slot }}</dd></div><div><dt>Duração</dt><dd>{{ recording.duration }}</dd></div>{% if recording.playable %}<div><dt>Tamanho</dt><dd>{{ recording.size_label }}</dd></div>{% endif %}</dl>
+{% if recording.missing_segments %}<p class="recording-note">Esta gravação possui intervalos sem vídeo.</p>{% endif %}
+{% if recording.audio_status == 'not_detected' %}<p class="muted recording-note">Não foi detectado áudio nesta gravação.</p>{% endif %}
+{% if recording.playable %}<p><a class="button primary" href="{% url 'recording_download' recording.url_id %}">Baixar MP4</a></p>{% endif %}
+</section>
+{% endblock %}

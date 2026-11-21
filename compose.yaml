@@ -1,0 +1,204 @@
+name: sma-replica
+x-logging: &logs
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+x-protected: &protected
+  read_only: true
+  tmpfs: ["/tmp:rw,nosuid,nodev,noexec,size=64m"]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging: *logs
+x-backend: &backend
+  <<: *protected
+  image: sma-local/portal:20261121-dominios
+  pull_policy: never
+  env_file: ./runtime/portal.env
+
+services:
+  db:
+    image: postgres:17-bookworm@sha256:8d174ddfb292f26b6ec8d97f55d944ccab547fa8bfe9e4fd3c24afdc819ee423
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sma
+      POSTGRES_USER: sma_dba
+      POSTGRES_PASSWORD_FILE: /run/secrets/admin
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ./runtime/admin:/run/secrets/admin:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "5432", "-U", "sma_dba", "-d", "sma"]
+      interval: 5s
+      timeout: 4s
+      retries: 15
+    logging: *logs
+
+  db-init:
+    <<: *protected
+    image: postgres:17-bookworm@sha256:8d174ddfb292f26b6ec8d97f55d944ccab547fa8bfe9e4fd3c24afdc819ee423
+    depends_on:
+      db: {condition: service_healthy}
+    environment: {PGHOST: db, PGDATABASE: sma, PGUSER: sma_dba}
+    volumes:
+      - ./runtime/admin:/run/secrets/admin:ro
+      - ./runtime/app-db:/run/secrets/app-db:ro
+      - ./runtime/domains-db:/run/secrets/domains-db:ro
+      - ./runtime/recorder-db:/run/secrets/recorder-db:ro
+      - ./deploy/db-init.sh:/sma/db-init.sh:ro
+    entrypoint: ["/bin/sh", "/sma/db-init.sh"]
+
+  provisionar:
+    <<: *backend
+    depends_on:
+      db-init: {condition: service_completed_successfully}
+    volumes:
+      - ./runtime/app.json:/run/secrets/app.json:ro
+      - ./runtime/bootstrap.json:/run/secrets/bootstrap.json:ro
+      - ./gravador/grant-metadata.sql:/sma/grant-metadata.sql:ro
+      - ./deploy/grant-domains.sql:/sma/grant-domains.sql:ro
+      - ./deploy/provisionar.py:/app/provisionar.py:ro
+    command: ["python", "/app/provisionar.py"]
+
+  backend:
+    <<: *backend
+    build: {context: ., dockerfile: backend/Dockerfile}
+    restart: unless-stopped
+    depends_on:
+      provisionar: {condition: service_completed_successfully}
+    volumes:
+      - ./runtime/hls:/var/www/hls:ro
+      - ./runtime/app.json:/run/secrets/app.json:ro
+      - ./runtime/acervo:/var/lib/sma-recordings
+    command: ["gunicorn","--no-control-socket","sma.wsgi:application","--bind","0.0.0.0:8000","--workers","2","--threads","2","--timeout","60","--worker-tmp-dir","/tmp","--access-logfile","/dev/null","--error-logfile","-"]
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=4).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  realtime-gateway:
+    env_file: ./runtime/revisao.env
+    <<: *protected
+    restart: unless-stopped
+    build: {context: ., dockerfile: realtime/Dockerfile}
+    depends_on:
+      backend: {condition: service_healthy}
+    volumes:
+      - ./runtime/realtime.json:/run/secrets/realtime.json:ro
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/healthz',timeout=3).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  realtime:
+    <<: *protected
+    image: ossrs/srs@sha256:2be08a0fe28737bf28bae8a575bb5776e09b620366dd1e62dd4f8a41cf4310f3
+    command: ["./objs/srs","-c","/run/secrets/srs.conf"]
+    depends_on:
+      realtime-gateway: {condition: service_healthy}
+    restart: unless-stopped
+    ports: ["28080:28080/udp","28080:28080/tcp"]
+    volumes: ["./runtime/srs.conf:/run/secrets/srs.conf:ro"]
+
+  media:
+    env_file: ./runtime/revisao.env
+    build: {context: ., dockerfile: Dockerfile, target: runtime}
+    restart: unless-stopped
+    environment: {SMA_TRUSTED_PROXY: 172.30.91.2}
+    depends_on:
+      realtime: {condition: service_started}
+      backend: {condition: service_healthy}
+    ports: ["19350:1935"]
+    volumes:
+      - ./runtime/hls:/var/www/hls
+      - ./runtime/nginx-internal.conf:/etc/nginx/sma-internal-header.conf:ro
+    read_only: true
+    tmpfs:
+      - /run:rw,nosuid,nodev,noexec,size=16m
+      - /var/lib/nginx:rw,nosuid,nodev,noexec,size=32m
+      - /tmp:rw,nosuid,nodev,noexec,size=32m
+    security_opt: [no-new-privileges:true]
+    networks:
+      default: {}
+      edge: {ipv4_address: 172.30.91.3}
+    logging: *logs
+    healthcheck:
+      test: ["CMD","python3","-c","import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz',timeout=4).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  gravador:
+    <<: *protected
+    build: ./gravador
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGDATABASE: sma
+      PGUSER: sma_recorder
+      PGPORT: "5432"
+      SMA_PGPASSWORD_FILE: /run/secrets/recorder-db
+    depends_on:
+      provisionar: {condition: service_completed_successfully}
+      media: {condition: service_healthy}
+    volumes:
+      - ./runtime/hls:/hls:ro
+      - ./runtime/acervo:/var/lib/sma-recordings
+      - ./runtime/recorder-db:/run/secrets/recorder-db:ro
+    healthcheck:
+      test: ["CMD","python3","-c","import json,pathlib,time; p=pathlib.Path('/var/lib/sma-recordings/status.json'); assert time.time()-p.stat().st_mtime < 90; json.loads(p.read_bytes())"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  dominios:
+    <<: *protected
+    image: sma-local/portal:20261121-dominios
+    pull_policy: never
+    restart: unless-stopped
+    env_file: ./runtime/dominios.env
+    environment:
+      PGHOST: db
+      PGDATABASE: sma
+      PGUSER: sma_domains
+      RES_OPTIONS: "attempts:1 timeout:3"
+      SMA_PGPASSWORD_FILE: /run/secrets/domains-db
+    depends_on:
+      provisionar: {condition: service_completed_successfully}
+      https: {condition: service_started}
+    volumes:
+      - ./runtime/domains-db:/run/secrets/domains-db:ro
+      - ./deploy/domain_worker.py:/sma/domain_worker.py:ro
+    command: ["python", "-u", "/sma/domain_worker.py"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,time; assert time.time()-os.stat('/tmp/sma-dominios.heartbeat').st_mtime < 90"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+    networks: [default, edge]
+
+  https:
+    env_file: ./runtime/revisao.env
+    command: ["caddy", "run", "--config", "/etc/caddy/sma.json"]
+    image: caddy:2-alpine@sha256:fc9cbc100585871d18d4e451cca7021785c90a7006087427ae5ceb3e4efe6424
+    restart: unless-stopped
+    depends_on:
+      media: {condition: service_healthy}
+    ports: ["80:80","443:443"]
+    volumes:
+      - ./runtime/caddy.json:/etc/caddy/sma.json:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      edge: {ipv4_address: 172.30.91.2}
+    logging: *logs
+    security_opt: [no-new-privileges:true]
+
+networks:
+  edge:
+    ipam:
+      config: [{subnet: 172.30.91.0/29}]
+volumes:
+  database:
+  caddy_data:
+  caddy_config:

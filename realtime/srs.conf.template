@@ -1,0 +1,32 @@
+listen 1935;
+max_connections 192;
+daemon off;
+pid /tmp/srs.pid;
+srs_log_tank console;
+srs_log_level error;
+http_api { enabled on; listen 1985; }
+http_server { enabled off; }
+rtc_server {
+    enabled on;
+    listen 28080;
+    candidate __PUBLIC_IP__;
+    api_as_candidates off;
+    use_auto_detect_network_ip off;
+    protocol all;
+    tcp { enabled on; listen 28080; }
+}
+vhost __defaultVhost__ {
+    tcp_nodelay on;
+    min_latency on;
+    publish { mr off; }
+    play { gop_cache off; queue_length 3; mw_latency 0; }
+    rtc { enabled on; rtmp_to_rtc on; rtc_to_rtmp off; }
+    hls { enabled off; }
+    http_hooks {
+        enabled on;
+        on_publish http://realtime-gateway:8091/internal/callback?secret=__CALLBACK_TOKEN__;
+        on_unpublish http://realtime-gateway:8091/internal/callback?secret=__CALLBACK_TOKEN__;
+        on_play http://realtime-gateway:8091/internal/callback?secret=__CALLBACK_TOKEN__;
+        on_stop http://realtime-gateway:8091/internal/callback?secret=__CALLBACK_TOKEN__;
+    }
+}
